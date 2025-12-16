@@ -1,0 +1,4 @@
+PyQt5==5.15.9
+SQLAlchemy==2.0.23
+bcrypt==4.1.2
+Pillow==10.1.0
