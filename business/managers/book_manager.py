@@ -39,25 +39,24 @@ class BookManager:
         try:
             books = session.query(Book).all()
             return books
-        finally:
+        except Exception as e:
             session.close()
+            raise
     
     @staticmethod
-    def search_books(query, search_by='title'):
-        """Поиск книг"""
+    def search_books(query):
+        """Универсальный поиск книг по названию, автору или ISBN"""
         session = get_session()
         try:
-            if search_by == 'title':
-                books = session.query(Book).filter(Book.title.like(f'%{query}%')).all()
-            elif search_by == 'author':
-                books = session.query(Book).filter(Book.author.like(f'%{query}%')).all()
-            elif search_by == 'isbn':
-                books = session.query(Book).filter(Book.isbn.like(f'%{query}%')).all()
-            else:
-                books = []
+            books = session.query(Book).filter(
+                (Book.title.like(f'%{query}%')) |
+                (Book.author.like(f'%{query}%')) |
+                (Book.isbn.like(f'%{query}%'))
+            ).all()
             return books
-        finally:
+        except Exception as e:
             session.close()
+            raise
     
     @staticmethod
     def get_book_by_id(book_id):
@@ -66,8 +65,9 @@ class BookManager:
         try:
             book = session.query(Book).filter(Book.id == book_id).first()
             return book
-        finally:
+        except Exception as e:
             session.close()
+            raise
     
     @staticmethod
     def update_book(book_id, **kwargs):
@@ -126,5 +126,28 @@ class BookManager:
         try:
             genres = session.query(Genre).all()
             return genres
-        finally:
+        except Exception as e:
             session.close()
+            raise
+    
+    @staticmethod
+    def get_books_by_genre(genre_id):
+        """Получить книги по жанру"""
+        session = get_session()
+        try:
+            books = session.query(Book).filter(Book.genre_id == genre_id).all()
+            return books
+        except Exception as e:
+            session.close()
+            raise
+    
+    @staticmethod
+    def get_available_books():
+        """Получить доступные книги"""
+        session = get_session()
+        try:
+            books = session.query(Book).filter(Book.available_quantity > 0).all()
+            return books
+        except Exception as e:
+            session.close()
+            raise

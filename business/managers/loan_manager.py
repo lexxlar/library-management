@@ -9,13 +9,15 @@ from config import LOAN_PERIODS
 class LoanManager:
     
     @staticmethod
-    def calculate_due_date(category):
+    def calculate_due_date(category, due_date=None):
         """Расчет срока возврата"""
+        if due_date:
+            return due_date
         days = LOAN_PERIODS.get(category, 14)
         return date.today() + timedelta(days=days)
     
     @staticmethod
-    def create_loan(book_id, reader_id, librarian_id, notes=None):
+    def create_loan(reader_id, book_id, due_date, librarian_id=None, notes=None):
         """Создать выдачу книги"""
         session = get_session()
         try:
@@ -29,8 +31,8 @@ class LoanManager:
             if not reader:
                 raise Exception("Читатель не найден")
             
-            # Расчет срока возврата
-            due_date = LoanManager.calculate_due_date(reader.category)
+            if reader.is_blocked:
+                raise Exception("Читательский билет заблокирован")
             
             # Создание выдачи
             loan = Loan(
@@ -57,7 +59,7 @@ class LoanManager:
             session.close()
     
     @staticmethod
-    def return_loan(loan_id):
+    def return_book(loan_id, condition_notes=None, fine_amount=0):
         """Вернуть книгу"""
         session = get_session()
         try:
@@ -71,21 +73,27 @@ class LoanManager:
             # Обновление статуса выдачи
             loan.return_date = datetime.now()
             loan.status = 'returned'
+            loan.condition_notes = condition_notes
             
             # Увеличение доступного количества
             book = session.query(Book).filter(Book.id == loan.book_id).first()
             book.increase_quantity()
             
-            # Проверка просрочки и создание штрафа
-            fine_amount = None
-            if loan.is_overdue():
+            # Создание штрафа если указана сумма
+            if fine_amount > 0:
                 from business.managers.fine_manager import FineManager
-                days_overdue = loan.calculate_days_overdue()
-                fine_amount = FineManager.create_fine(loan_id, days_overdue, session)
+                from data.models.fine import Fine
+                
+                fine = Fine(
+                    loan_id=loan_id,
+                    amount=fine_amount,
+                    status='unpaid'
+                )
+                session.add(fine)
             
             session.commit()
             logger.info(f"Книга возвращена: Loan ID {loan_id}")
-            return loan, fine_amount
+            return loan
         except Exception as e:
             session.rollback()
             logger.error(f"Ошибка возврата книги: {e}")
@@ -123,14 +131,16 @@ class LoanManager:
             session.close()
     
     @staticmethod
-    def get_all_active_loans():
+    def get_active_loans():
         """Получить все активные выдачи"""
         session = get_session()
         try:
             loans = session.query(Loan).filter(Loan.status == 'active').all()
+            # Важно: не закрываем сессию, чтобы можно было обращаться к связанным объектам
             return loans
-        finally:
+        except Exception as e:
             session.close()
+            raise
     
     @staticmethod
     def get_overdue_loans():
@@ -142,8 +152,51 @@ class LoanManager:
                 Loan.due_date < date.today()
             ).all()
             return loans
-        finally:
+        except Exception as e:
             session.close()
+            raise
+    
+    @staticmethod
+    def get_loans_due_today():
+        """Получить выдачи, срок которых истекает сегодня"""
+        session = get_session()
+        try:
+            loans = session.query(Loan).filter(
+                Loan.status == 'active',
+                Loan.due_date == date.today()
+            ).all()
+            return loans
+        except Exception as e:
+            session.close()
+            raise
+    
+    @staticmethod
+    def search_active_loans(query):
+        """Поиск активных выдач"""
+        session = get_session()
+        try:
+            loans = session.query(Loan).join(Reader).join(Book).filter(
+                Loan.status == 'active',
+                (Reader.last_name.like(f'%{query}%')) |
+                (Reader.first_name.like(f'%{query}%')) |
+                (Reader.card_number.like(f'%{query}%')) |
+                (Book.title.like(f'%{query}%'))
+            ).all()
+            return loans
+        except Exception as e:
+            session.close()
+            raise
+    
+    @staticmethod
+    def get_loan_history(limit=100):
+        """Получить историю выдач"""
+        session = get_session()
+        try:
+            loans = session.query(Loan).order_by(Loan.loan_date.desc()).limit(limit).all()
+            return loans
+        except Exception as e:
+            session.close()
+            raise
     
     @staticmethod
     def get_loan_by_id(loan_id):
@@ -152,5 +205,6 @@ class LoanManager:
         try:
             loan = session.query(Loan).filter(Loan.id == loan_id).first()
             return loan
-        finally:
+        except Exception as e:
             session.close()
+            raise

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Date, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Date, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime, date, timedelta
 from data.database import Base
@@ -14,7 +14,8 @@ class Loan(Base):
     return_date = Column(DateTime)
     status = Column(String(20), default='active')  # active, returned, overdue
     librarian_id = Column(Integer, ForeignKey('users.id'))
-    notes = Column(String(500))
+    notes = Column(Text)
+    condition_notes = Column(Text)  # Примечания о состоянии книги при возврате
     
     # Связи
     book = relationship("Book", backref="loans")
@@ -27,11 +28,31 @@ class Loan(Base):
             return False
         return date.today() > self.due_date
     
-    def calculate_days_overdue(self) -> int:
-        """Расчет дней просрочки"""
-        if not self.is_overdue():
+    def get_overdue_days(self) -> int:
+        """Расчет дней просрочки (используется в UI)"""
+        if self.status == 'returned':
+            # Если книга уже возвращена, считаем просрочку от даты возврата
+            if self.return_date:
+                return_date_only = self.return_date.date()
+                if return_date_only > self.due_date:
+                    return (return_date_only - self.due_date).days
             return 0
-        return (date.today() - self.due_date).days
+        
+        # Для активных выдач считаем от текущей даты
+        if date.today() > self.due_date:
+            return (date.today() - self.due_date).days
+        return 0
+    
+    def calculate_days_overdue(self) -> int:
+        """Алиас для обратной совместимости"""
+        return self.get_overdue_days()
+    
+    def mark_as_returned(self, condition_notes=None):
+        """Пометить как возвращенную"""
+        self.return_date = datetime.now()
+        self.status = 'returned'
+        if condition_notes:
+            self.condition_notes = condition_notes
     
     def __repr__(self):
         return f"<Loan(book_id={self.book_id}, reader_id={self.reader_id}, status='{self.status}')>"

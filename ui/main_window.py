@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QTabWidget, QTableWidget, QTableWidgetItem, QPushButton,
                              QLabel, QLineEdit, QMessageBox, QHeaderView, QAbstractItemView,
                              QToolBar, QAction, QStatusBar, QMenuBar, QMenu, QComboBox)
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, QSize
 from PyQt5.QtGui import QIcon, QFont
 from datetime import datetime
 
@@ -101,7 +101,7 @@ class MainWindow(QMainWindow):
         """Создание панели инструментов"""
         toolbar = QToolBar()
         toolbar.setMovable(False)
-        toolbar.setIconSize(Qt.Size(32, 32))
+        toolbar.setIconSize(QSize(32, 32))
         self.addToolBar(toolbar)
         
         # Кнопки быстрого доступа
