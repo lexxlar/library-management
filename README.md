@@ -1,5 +1,6 @@
 # Программа
-Находится в архиве `dist.7z`
+Программу можно скачать по ссылке:
+https://drive.google.com/file/d/1NdLFlfxoK110SQe_EcmZNg69ZU4avEI6/view?usp=sharing
 
 
 # Работа с кодом. Виртуальное окружение
